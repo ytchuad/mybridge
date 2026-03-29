@@ -34,14 +34,24 @@
                     filters: [{ name: 'HID_Device' }],
                     optionalServices: [S_UUID]
                 });
+                
+                document.getElementById('st').innerText = "Connecting... Please wait.";
                 const server = await device.gatt.connect();
+        
+                // --- 關鍵修正：連線後停頓 1.5 秒，給予 Pi Zero 準備服務的時間 ---
+                await new Promise(r => setTimeout(r, 1500));
+        
                 const service = await server.getPrimaryService(S_UUID);
                 char = await service.getCharacteristic(R_UUID);
+        
                 document.getElementById('st').innerText = "Connected ✅";
                 document.getElementById('st').style.color = "#34C759";
                 document.getElementById('sB').disabled = false;
                 document.getElementById('cB').style.display = "none";
-            } catch (e) { alert("Connect Error: " + e); }
+            } catch (e) { 
+                alert("Connect Error: " + e); 
+                document.getElementById('st').innerText = "Status: Disconnected";
+            }
         }
 
         async function send() {
