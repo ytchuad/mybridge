@@ -1,78 +1,78 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=0">
-    <title>Text Bridge Pro</title>
-    <style>
-        body { font-family: -apple-system, sans-serif; padding: 20px; background: #f2f2f7; color: #1c1c1e; text-align: center; }
-        .card { background: white; padding: 20px; border-radius: 15px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); max-width: 500px; margin: auto; }
-        textarea { width: 100%; height: 250px; border: 1px solid #d1d1d6; border-radius: 10px; padding: 12px; font-size: 16px; box-sizing: border-box; outline: none; margin-bottom: 10px; }
-        .btn { width: 100%; height: 55px; border: none; border-radius: 10px; font-size: 17px; font-weight: 600; cursor: pointer; margin-top: 10px; }
-        .btn-c { background: #34C759; color: white; }
-        .btn-s { background: #007AFF; color: white; }
-        .btn:disabled { background: #ccc; cursor: not-allowed; }
-        #st { font-size: 13px; color: #8e8e93; margin-top: 8px; }
-    </style>
-</head>
+<!DOCTYPE html><html><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=0"><title>Text Bridge BLE Pro</title>
+<style>
+:root{--primary:#007AFF;--bg:#f2f2f7} body{font-family:-apple-system,sans-serif;margin:0;background:var(--bg);color:#1c1c1e}
+header{background:#fff;padding:15px;display:flex;align-items:center;box-shadow:0 1px 5px rgba(0,0,0,0.1);position:sticky;top:0;z-index:100}
+.menu-btn{font-size:28px;cursor:pointer;margin-right:15px;padding:5px} .container{padding:15px;max-width:600px;margin:auto}
+.page{display:none} .page.active{display:block} .card{background:#fff;padding:20px;border-radius:12px;box-shadow:0 2px 8px rgba(0,0,0,0.05);margin-bottom:15px}
+textarea{width:100%;height:220px;border:1px solid #d1d1d6;border-radius:8px;padding:12px;font-size:16px;box-sizing:border-box;outline:none}
+.btn{width:100%;height:55px;border:none;border-radius:10px;font-size:17px;font-weight:600;margin-top:10px;cursor:pointer}
+.btn-c{background:#34c759;color:white} .btn-blue{background:var(--primary);color:white} .btn-red{background:#FF3B30;color:white}
+.side-menu{position:fixed;left:-280px;top:0;width:260px;height:100%;background:#fff;z-index:200;transition:0.3s;box-shadow:2px 0 10px rgba(0,0,0,0.1)}
+.side-menu.open{left:0} .menu-item{padding:20px;border-bottom:1px solid #f2f2f7;font-size:17px;cursor:pointer}
+.overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.4);display:none;z-index:150}
+.h-item{font-size:12px;padding:12px;background:#f9f9fb;margin-bottom:8px;border-radius:8px;border:1px solid #eee;cursor:pointer}
+</style></head>
 <body>
-    <div class="card">
-        <h3>🔗 Text Bridge Pro</h3>
-        <button id="cB" class="btn btn-c" onclick="connect()">Connect Bluetooth</button>
-        <div id="st">Status: Disconnected</div>
-        <textarea id="tx" placeholder="Paste data here..."></textarea>
-        <button id="sB" class="btn btn-s" onclick="send()" disabled>Transmit to Laptop</button>
+<header><div class="menu-btn" onclick="toggleMenu()">☰</div><div style="font-weight:bold;font-size:18px">Text Bridge (BLE)</div></header>
+<div class="overlay" id="ov" onclick="toggleMenu()"></div>
+<div class="side-menu" id="sm">
+    <div style="padding:30px 20px; font-weight:bold; color:var(--primary); font-size:20px;">BLE Menu</div>
+    <div class="menu-item" onclick="showPage('main')">⌨️ Transmission</div>
+    <div class="menu-item" onclick="showPage('history')">📜 Local History</div>
+    <div class="menu-item" onclick="showPage('settings')">⚙️ Settings</div>
+</div>
+
+<div class="container">
+    <div id="main" class="page active">
+        <div class="card">
+            <button id="cB" class="btn btn-c" onclick="connectBT()">1. Connect Bluetooth</button>
+            <div id="st" style="font-size:12px;text-align:center;color:#888;margin:5px 0">Disconnected</div>
+            <textarea id="tx" placeholder="Paste data here..."></textarea>
+            <button class="btn" style="background:#8e8e93;color:white;height:35px;font-size:13px" onclick="document.getElementById('tx').value=''">Clear Textbox</button>
+            <div style="margin-top:15px"><label style="font-size:11px;font-weight:700;color:#8e8e93">SPEED: <span id="cv">20</span> CPS</label>
+            <input type="range" id="sp" style="width:100%" min="5" max="60" value="20" oninput="document.getElementById('cv').innerText=this.value"></div>
+            <button id="sB" class="btn btn-blue" onclick="send()" disabled>2. Transmit to Laptop</button>
+        </div>
     </div>
-    <script>
-        let char;
-        const S_UUID = "6e400001-b5a3-f393-e0a9-e50e24dcca9e";
-        const R_UUID = "6e400002-b5a3-f393-e0a9-e50e24dcca9e";
 
-        async function connect() {
-            try {
-                const device = await navigator.bluetooth.requestDevice({
-                    filters: [{ name: 'HID_Device' }],
-                    optionalServices: [S_UUID]
-                });
-                
-                document.getElementById('st').innerText = "Connecting... Please wait.";
-                const server = await device.gatt.connect();
-        
-                // --- 關鍵修正：連線後停頓 1.5 秒，給予 Pi Zero 準備服務的時間 ---
-                await new Promise(r => setTimeout(r, 1500));
-        
-                const service = await server.getPrimaryService(S_UUID);
-                char = await service.getCharacteristic(R_UUID);
-        
-                document.getElementById('st').innerText = "Connected ✅";
-                document.getElementById('st').style.color = "#34C759";
-                document.getElementById('sB').disabled = false;
-                document.getElementById('cB').style.display = "none";
-            } catch (e) { 
-                alert("Connect Error: " + e); 
-                document.getElementById('st').innerText = "Status: Disconnected";
-            }
-        }
+    <div id="history" class="page"><div class="card"><h3>Local History</h3><div id="hList"></div><button class="btn btn-red" onclick="clearLocalH()">Clear All</button></div></div>
+    
+    <div id="settings" class="page"><div class="card"><h3>Settings</h3>
+        <p style="font-size:13px;color:#666">Note: Bluetooth mode uses local browser storage for history.</p>
+        <div style="display:flex;justify-content:space-between;padding:10px 0"><span>Auto-clear after task</span><input type="checkbox" id="set_clear" checked></div>
+    </div></div>
+</div>
 
-        async function send() {
-            const text = document.getElementById('tx').value;
-            if (!text || !char) return;
-            const btn = document.getElementById('sB');
-            btn.innerText = "Transmitting...";
-            btn.disabled = true;
-            const data = new TextEncoder().encode(text);
-            const CHUNK_SIZE = 20; 
-            try {
-                for (let i = 0; i < data.length; i += CHUNK_SIZE) {
-                    const chunk = data.slice(i, i + CHUNK_SIZE);
-                    await char.writeValue(chunk);
-                    await new Promise(r => setTimeout(r, 60));
-                }
-                alert("Success!");
-            } catch (e) { alert("Send Error: " + e); }
-            btn.innerText = "Transmit to Laptop";
-            btn.disabled = false;
+<script>
+    let char, gH = JSON.parse(localStorage.getItem('ble_history') || '[]');
+    function toggleMenu() { document.getElementById('sm').classList.toggle('open'); document.getElementById('ov').style.display = document.getElementById('sm').classList.contains('open')?'block':'none'; }
+    function showPage(p) { document.querySelectorAll('.page').forEach(x=>x.classList.remove('active')); document.getElementById(p).classList.add('active'); if(p==='history') renderH(); toggleMenu(); }
+    
+    async function connectBT() {
+        try {
+            let d = await navigator.bluetooth.requestDevice({filters:[{name:'HID_Device'}], optionalServices:['6e400001-b5a3-f393-e0a9-e50e24dcca9e']});
+            let s = await d.gatt.connect();
+            let sv = await s.getPrimaryService('6e400001-b5a3-f393-e0a9-e50e24dcca9e');
+            char = await sv.getCharacteristic('6e400002-b5a3-f393-e0a9-e50e24dcca9e');
+            document.getElementById('st').innerText="Connected ✅"; document.getElementById('sB').disabled=false; document.getElementById('cB').style.display="none";
+        } catch(e) { alert(e); }
+    }
+
+    async function send() {
+        let t = document.getElementById('tx').value; if(!t || !char) return;
+        saveLocalH(t);
+        let data = new TextEncoder().encode(t);
+        document.getElementById('sB').innerText="Transmitting...";
+        for(let i=0; i<data.length; i+=20) {
+            await char.writeValue(data.slice(i, i+20));
+            await new Promise(r => setTimeout(r, 60));
         }
-    </script>
-</body>
-</html>
+        document.getElementById('sB').innerText="Transmit to Laptop";
+        if(document.getElementById('set_clear').checked) document.getElementById('tx').value="";
+        alert("Finished!");
+    }
+
+    function saveLocalH(t) { if(!t.strip || gH.includes(t)) return; gH.unshift(t); gH=gH.slice(0,10); localStorage.setItem('ble_history', JSON.stringify(gH)); }
+    function renderH() { let h=''; gH.forEach(t=>{ h+=`<div class="h-item" onclick="document.getElementById('tx').value=this.innerText;showPage('main')">${t}</div>`; }); document.getElementById('hList').innerHTML=h || 'No records.'; }
+    function clearLocalH() { gH=[]; localStorage.removeItem('ble_history'); renderH(); }
+</script></body></html>
